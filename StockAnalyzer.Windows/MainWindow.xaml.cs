@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -18,6 +21,32 @@ namespace StockAnalyzer.Windows
             InitializeComponent();
         }
 
+        //private async void Search_Click(object sender, RoutedEventArgs e)
+        //{
+        //    #region Before loading stock data
+        //    var watch = new Stopwatch();
+        //    watch.Start();
+        //    StockProgress.Visibility = Visibility.Visible;
+        //    StockProgress.IsIndeterminate = true;
+        //    #endregion
+
+        //    try
+        //    {
+        //        await GetStocks();
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Notes.Text += ex.Message;
+        //    }
+
+
+        //    #region After stock data is loaded
+        //    StocksStatus.Text = $"Loaded stocks for {Ticker.Text} in {watch.ElapsedMilliseconds}ms";
+        //    StockProgress.Visibility = Visibility.Hidden;
+        //    #endregion
+        //}
+
+
         private async void Search_Click(object sender, RoutedEventArgs e)
         {
             #region Before loading stock data
@@ -27,14 +56,35 @@ namespace StockAnalyzer.Windows
             StockProgress.IsIndeterminate = true;
             #endregion
 
-            try
+          await  Task.Run(() =>
             {
-                await GetStocks();
-            }
-            catch (Exception ex)
-            {
-                Notes.Text += ex.Message;
-            }
+
+                var lines = File.ReadAllLines(@"C:\tutorials\Asynchronous-programming\StockAnalyzer\StockAnalyzer.Web\StockPrices_Small.csv");
+                var data = new List<StockPrice>();
+
+                foreach (var line in lines.Skip(1))
+                {
+                    var segments = line.Split(',');
+
+                    for (var i = 0; i < segments.Length; i++) segments[i] = segments[i].Trim('\'', '"');
+                    var price = new StockPrice
+                    {
+                        Ticker = segments[0],
+                        TradeDate = DateTime.ParseExact(segments[1], "M/d/yyyy h:mm:ss tt", CultureInfo.InvariantCulture),
+                        Volume = Convert.ToInt32(segments[6], CultureInfo.InvariantCulture),
+                        Change = Convert.ToDecimal(segments[7], CultureInfo.InvariantCulture),
+                        ChangePercent = Convert.ToDecimal(segments[8], CultureInfo.InvariantCulture),
+                    };
+                    data.Add(price);
+                }
+
+                Dispatcher.Invoke(() =>
+                {
+                    Stocks.ItemsSource = data.Where(p => p.Ticker == Ticker.Text);
+                });
+
+            });
+
 
 
             #region After stock data is loaded
@@ -42,9 +92,6 @@ namespace StockAnalyzer.Windows
             StockProgress.Visibility = Visibility.Hidden;
             #endregion
         }
-
-
-
         public async Task GetStocks()
         {
             using (var client = new HttpClient())
